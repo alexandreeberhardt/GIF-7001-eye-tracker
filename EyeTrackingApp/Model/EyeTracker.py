@@ -19,7 +19,7 @@ class EyeTracker:
 		self.frame_average = frame_average
 		self.video_writer = None
 		self.fourcc = cv2.VideoWriter_fourcc(*'XVID')
-		self.positions
+		self.positions = None
 
 		#Buffer pour le lissage
 		self.left_buffer = []
@@ -55,7 +55,7 @@ class EyeTracker:
 		results = self.face_mesh.process(frame)
 
 		if not results.multi_face_landmarks:
-			return frame
+			return Positions(None,None,None,None)
 
 		lm = results.multi_face_landmarks[0].landmark
 
@@ -88,6 +88,10 @@ class EyeTracker:
 				break
 
 		self.cleanup()
+
+	def get_positions(self):
+		ret, frame = self.cap.read()
+		return self.process_frame(frame)
 
 	def cleanup(self):
 		self.cap.release()

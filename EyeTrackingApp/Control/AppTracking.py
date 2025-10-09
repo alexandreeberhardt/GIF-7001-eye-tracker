@@ -3,6 +3,7 @@ from Model.NotificationList import AppNotification
 from Model.GlobalVariables import GlobalVariables
 from Model.SingletonDecorator import singleton
 from Model.ThreadWorker import Worker
+from Model.EyeTracker import EyeTracker
 import random as rd
 import shutil
 import time
@@ -10,7 +11,7 @@ import os
 
 
 @singleton
-class EyeTracking():
+class AppTracking():
 	def __init__(self):
 		super().__init__()
 		self.actual_worker = Worker(self.tracking_function, None)
@@ -31,11 +32,13 @@ class EyeTracking():
 			self.actual_worker.stop()
 
 	def tracking_function(self, args, progress_callback=None, worker=None):
+		eye_tracker = EyeTracker()
 		while True:
 			if worker.is_stopped():
 				break
-			progress_callback(rd.randint(0,10))
-			time.sleep(1)
+			pos = eye_tracker.get_positions()
+			progress_callback(f"eye left:{pos.eye_left}\neye right:{pos.eye_right}\niris left:{pos.iris_left}\niris right:{pos.iris_right}\n----")
+		eye_tracker.cleanup()
 		return 0
 
 	def show_positions(self, positions):
