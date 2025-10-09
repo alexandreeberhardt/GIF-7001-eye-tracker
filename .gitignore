@@ -81,7 +81,3 @@ venv/
 
 # PyCharm specific files
 .idea/*
-.idea/sqlDataSources.xml
-.idea/dynamic.xml
-.idea/csv-plugin.xml
-.idea/shelf/
