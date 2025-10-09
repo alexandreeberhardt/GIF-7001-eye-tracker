@@ -4,6 +4,7 @@ from Model.GlobalVariables import GlobalVariables
 from Model.SingletonDecorator import singleton
 from Model.ThreadWorker import Worker
 from Model.EyeTracker import EyeTracker
+import numpy as np
 import random as rd
 import shutil
 import time
@@ -36,8 +37,14 @@ class AppTracking():
 		while True:
 			if worker.is_stopped():
 				break
-			pos = eye_tracker.get_positions()
-			progress_callback(f"eye left:{pos.eye_left}\neye right:{pos.eye_right}\niris left:{pos.iris_left}\niris right:{pos.iris_right}\n----")
+			infos = eye_tracker.get_infos()
+
+			if infos.eye_left is not None:
+				dydx_left = 2*(infos.eye_left-infos.iris_left)/infos.left_size
+				dydx_right = 2*(infos.eye_right-infos.iris_right)/infos.right_size
+
+				test = f"{dydx_left[0]:3.2f} | {dydx_left[-1]:3.2f}"
+				progress_callback((dydx_left, dydx_right))
 		eye_tracker.cleanup()
 		return 0
 
@@ -47,3 +54,7 @@ class AppTracking():
 	def close_tracking_thread(self, infos):
 		if type(infos) is str:
 			NotificationCenter().post_notification(AppNotification.SEND_ERROR_MESSAGE, self, f"error: {infos}")
+
+	def angle_from_dxdy(self, dy, dx):
+		angle = np.degrees(np.arctan2(dy, dx))
+		return angle % 360

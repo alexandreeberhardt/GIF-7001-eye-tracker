@@ -6,11 +6,13 @@ import numpy as np
 import cv2
 
 @dataclass
-class Positions:
+class EyesInfos:
 	eye_left: np.ndarray
 	eye_right: np.ndarray
 	iris_left: np.ndarray
 	iris_right: np.ndarray
+	left_size: float
+	right_size: float
 
 
 class EyeTracker:
@@ -28,8 +30,8 @@ class EyeTracker:
 		# Regions d'intérêts
 		self.LEFT_EYE = [33, 133, 160, 159, 158, 144, 153, 154, 155]
 		self.RIGHT_EYE = [362, 263, 387, 386, 385, 373, 380, 381, 382]
-		self.LEFT_IRIS = [474, 475, 476, 477]
-		self.RIGHT_IRIS = [469, 470, 471, 472]
+		self.LEFT_IRIS = [469, 470, 471, 472]
+		self.RIGHT_IRIS = [474, 475, 476, 477]
 
 		# MediaPipe Face Mesh
 		self.face_mesh = mp.solutions.face_mesh.FaceMesh(max_num_faces=1, refine_landmarks=True)
@@ -55,7 +57,7 @@ class EyeTracker:
 		results = self.face_mesh.process(frame)
 
 		if not results.multi_face_landmarks:
-			return Positions(None,None,None,None)
+			return EyesInfos(None,None,None,None,None,None)
 
 		lm = results.multi_face_landmarks[0].landmark
 
@@ -63,6 +65,11 @@ class EyeTracker:
 		right_eye_pos = self.get_eye_center(lm, self.RIGHT_EYE, w, h)
 		left_iris_pos = self.get_iris_center(lm, self.LEFT_IRIS, w, h)
 		right_iris_pos = self.get_iris_center(lm, self.RIGHT_IRIS, w, h)
+
+		x1, y1, x2, y2 = self.get_bbox(lm, self.LEFT_EYE, w, h, margin=5)
+		left_eye_minsize = np.min([ x2-x1, y2-y1 ])
+		x1, y1, x2, y2 = self.get_bbox(lm, self.RIGHT_EYE, w, h, margin=5)
+		right_eye_minsize = np.min([ x2-x1, y2-y1 ])
 
 		self.left_buffer.append(left_iris_pos)
 		self.right_buffer.append(right_iris_pos)
@@ -73,7 +80,7 @@ class EyeTracker:
 
 		left_smoothed_iris = np.mean(self.left_buffer, axis=0)
 		right_smoothed_iris = np.mean(self.right_buffer, axis=0)
-		return Positions(left_eye_pos, right_eye_pos, left_smoothed_iris, right_smoothed_iris)
+		return EyesInfos(left_eye_pos, right_eye_pos, left_smoothed_iris, right_smoothed_iris, left_eye_minsize, right_eye_minsize)
 
 	# --- Boucle principale ---
 	def run(self):
@@ -89,9 +96,12 @@ class EyeTracker:
 
 		self.cleanup()
 
-	def get_positions(self):
+	def get_infos(self):
 		ret, frame = self.cap.read()
-		return self.process_frame(frame)
+		infos = self.process_frame(frame)
+		dydx_left = 2*(infos.eye_left-infos.iris_left)/infos.left_size
+		dydx_right = 2*(infos.eye_right-infos.iris_right)/infos.right_size
+		return infos
 
 	def cleanup(self):
 		self.cap.release()

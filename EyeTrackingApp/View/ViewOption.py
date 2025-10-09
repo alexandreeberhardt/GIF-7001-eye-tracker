@@ -51,4 +51,5 @@ class ViewOption(ttk.Frame):
 		self.pb_stop.config(state="disabled")
 
 	def show_positions(self, notification):
-		print(notification.posted_data)
+		pass
+		# print(notification.posted_data)
