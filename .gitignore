@@ -80,11 +80,4 @@ celerybeat-schedule
 venv/
 
 # PyCharm specific files
-.idea/workspace.xml
-.idea/tasks.xml
-.idea/datasources.xml
-.idea/dataSources.local.xml
-.idea/sqlDataSources.xml
-.idea/dynamic.xml
-.idea/csv-plugin.xml
-.idea/shelf/
+.idea/*
