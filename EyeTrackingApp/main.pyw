@@ -38,7 +38,7 @@ class SplashScreen(tk.Toplevel):
 		self.progress.start(10)
 
 def init_work(view, splash):
-	AppTracking()
+	AppTracking(splash.winfo_screenwidth(), splash.winfo_screenheight())
 	view.after(0, lambda: (splash.destroy(), view.deiconify()))
 
 if sys.platform == "win32":

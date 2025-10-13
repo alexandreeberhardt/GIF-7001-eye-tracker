@@ -19,72 +19,46 @@ class ViewCalibration(tk.Toplevel):
 	def __init__(self, shared_font=None):
 		super().__init__()
 		self.withdraw()
+		self.attributes('-fullscreen', True)# Plein écran
 		self.attributes("-topmost", True)
+		self.config(bg='black')
+
+		self.canvas = tk.Canvas(self, bg='black', highlightthickness=0)
+		self.canvas.pack(fill='both', expand=True)
+
 		self.iconbitmap(f"{os.path.abspath('')}{os.sep}View{os.sep}logo{os.sep}logo.ico")
 		self.shared_font = shared_font if shared_font else tkfont.Font(family="Arial", size=10)
 		self.protocol("WM_DELETE_WINDOW", self.on_close)
-		self.initialize_graph()
-		self.left_x = []
-		self.right_x = []
-		self.left_y = []
-		self.right_y = []
+		self.bind('<Escape>', lambda e: self.on_close())
 
 		NotificationCenter().add_observer(self, self.close_all_window, AppNotification.CLOSE_ALL_WINDOW)
 		NotificationCenter().add_observer(self, self.open_this_window, AppNotification.SHOW_SUB_WINDOW)
-		NotificationCenter().add_observer(self, self.draw_graph, AppNotification.SEND_POSITIONS)
-
-
+		NotificationCenter().add_observer(self, self.on_close, AppNotification.CLOSE_CALIBRATION_WINDOW)
+		NotificationCenter().add_observer(self, self.show_calibration_point, AppNotification.UPDATE_CALIBRATION_POINT)
 
 	def close_all_window(self, notification):
 		self.destroy()
 
-	def on_close(self):
+	def on_close(self, notification=None):
+		if notification is None:
+			NotificationCenter().post_notification(AppNotification.STOP_CALIBRATION, self, True)
 		self.withdraw()
 
 	def open_this_window(self, notification):
 		if notification.posted_data == "pb_calibrate":
 			self.deiconify()
 
-	def initialize_graph(self):
-		fig = Figure(figsize=(5, 4), dpi=100)
-		fig.tight_layout()
-		ax = fig.add_subplot(111)
-		ax.set_xlim(-1, 1)
-		ax.set_ylim(-1, 1)
-		self.line1, = ax.plot([], [], marker=".", color="r")
-		self.line2, = ax.plot([], [], marker=".", color="b")
+	def show_calibration_point(self, notification):
+		w = self.winfo_screenwidth()
+		h = self.winfo_screenheight()
 
-		self.angle_y = ax.text(-0.9, 0.9, "Angle y: 0.0", fontsize=12, ha='center')
-		self.angle_x = ax.text(-0.9, 0.8, "Angle y: 0.0", fontsize=12, ha='center')
-
-
-		self.canvas = FigureCanvasTkAgg(fig, master=self)
-		self.canvas.get_tk_widget().pack(fill=tk.BOTH, expand=True)
-
-	def draw_graph(self, notification):
-		pos = notification.posted_data
-
-		self.left_x.append(pos[0][-1])
-		self.right_x.append(pos[-1][-1])
-		self.left_y.append(pos[0][0])
-		self.right_y.append(pos[-1][0])
-
-		if len(self.left_x)>10:
-			self.left_x = self.left_x[-10:]
-			self.left_y = self.left_y[-10:]
-		if len(self.right_x)>10:
-			self.right_x = self.right_x[-10:]
-			self.right_y = self.right_y[-10:]
-
-		angle_y = np.mean([ self.compute_angle(np.mean(self.left_y)), self.compute_angle(np.mean(self.right_y)) ])
-		angle_x = np.mean([ self.compute_angle(np.mean(self.left_x)), self.compute_angle(np.mean(self.right_x)) ])
-
-		self.line1.set_data([np.mean(self.left_x)], [np.mean(self.left_y)])
-		self.line2.set_data([np.mean(self.right_x)], [np.mean(self.right_y)])
-		self.angle_y.set_text(f"Angle y: {angle_y:2.2f}")
-		self.angle_x.set_text(f"Angle x: {angle_x:2.2f}")
-		self.canvas.draw()
-
-	def compute_angle(self, x):
-		angle = np.degrees(np.arcsin(x))
-		return angle
+		point_id = notification.posted_data
+		rayon = int(0.05*np.min([w,h]))
+		self.canvas.delete('point')
+		if point_id != 10:
+			x = (point_id//3)*w/2
+			y = (point_id%3)*h/2
+			self.canvas.create_oval(
+				x - rayon, y - rayon,
+				x + rayon, y + rayon,
+				fill='lime', outline='', tags='point')
