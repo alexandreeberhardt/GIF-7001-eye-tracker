@@ -64,8 +64,8 @@ class ViewVisualisation(tk.Toplevel):
 		self.y.append(pos[0])
 
 		if len(self.x)>20:
-			self.x = self.x[:-20]
-			self.y = self.y[:-20]
+			self.x.pop(0)
+			self.y.pop(0)
 
 		print(pos)
 		# self.ax.set_xlim(np.min(self.x), np.min(self.x) + 10)
