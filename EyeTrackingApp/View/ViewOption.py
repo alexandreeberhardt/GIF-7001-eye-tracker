@@ -26,16 +26,20 @@ class ViewOption(ttk.Frame):
 		self.pb_start = ttk.Button(self, text="Start", command=self.start)
 		self.pb_stop = ttk.Button(self, text="Stop", command=self.stop, state="disabled")
 
-		self.pb_record = ttk.Button(self, text="Enregistrement", command=self.record)
+		self.pb_visualise = ttk.Button(self, text="Visualisation", command=self.visualise)
 		self.pb_calibrate = ttk.Button(self, text="Calibration", command = self.calibrate)
 
 		self.pb_start.grid(row=0, column=0, padx=5, pady=5, sticky="nsew")
 		self.pb_stop.grid(row=0, column=1, padx=5, pady=5, sticky="nsew")
-		self.pb_record.grid(row=1, column=0, padx=5, pady=5, sticky="nsew")
+		self.pb_visualise.grid(row=1, column=0, padx=5, pady=5, sticky="nsew")
 		self.pb_calibrate.grid(row=1, column=1, padx=5, pady=5, sticky="nsew")
 
 	def calibrate(self):
 		NotificationCenter().post_notification(AppNotification.SHOW_SUB_WINDOW, self, "pb_calibrate")
+		NotificationCenter().post_notification(AppNotification.START_CALIBRATION, self, "start calibration")
+
+	def visualise(self):
+		NotificationCenter().post_notification(AppNotification.SHOW_SUB_WINDOW, self, "pb_visualisation")
 
 	def record(self):
 		NotificationCenter().post_notification(AppNotification.RECORD, self, "record")
@@ -51,4 +55,5 @@ class ViewOption(ttk.Frame):
 		self.pb_stop.config(state="disabled")
 
 	def show_positions(self, notification):
-		print(notification.posted_data)
+		pass
+		# print(notification.posted_data)

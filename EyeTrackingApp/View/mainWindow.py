@@ -4,6 +4,7 @@ from Model.GlobalVariables import GlobalVariables
 from Model.SingletonDecorator import singleton
 from View.ViewOption import ViewOption
 from View.ViewCalibration import ViewCalibration
+from View.ViewVisualisation import ViewVisualisation
 from tkinter import font as tkfont
 from tkinter import ttk
 import tkinter as tk
@@ -61,6 +62,7 @@ class MainWindow(tk.Tk):
 
 		GlobalVariables().root = self
 		self.calibrationView = ViewCalibration(self.base_font)
+		self.visualisationView = ViewVisualisation(self.base_font)
 		self.protocol("WM_DELETE_WINDOW", self.closeEvent)
 		self.bind("<Configure>", self.on_resize)
 

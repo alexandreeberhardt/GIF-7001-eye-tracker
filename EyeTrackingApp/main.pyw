@@ -1,6 +1,6 @@
 from Model.GlobalVariables import GlobalVariables
 from View.mainWindow import MainWindow
-from Control.EyeTracking import EyeTracking
+from Control.AppTracking import AppTracking
 from tkinter import ttk
 import tkinter as tk
 import threading
@@ -38,7 +38,7 @@ class SplashScreen(tk.Toplevel):
 		self.progress.start(10)
 
 def init_work(view, splash):
-	EyeTracking()
+	AppTracking(splash.winfo_screenwidth(), splash.winfo_screenheight())
 	view.after(0, lambda: (splash.destroy(), view.deiconify()))
 
 if sys.platform == "win32":
