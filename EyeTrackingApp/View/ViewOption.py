@@ -57,3 +57,4 @@ class ViewOption(ttk.Frame):
 	def show_positions(self, notification):
 		pass
 		# print(notification.posted_data)
+		# print(notification.posted_data)

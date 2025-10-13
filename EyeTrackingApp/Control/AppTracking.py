@@ -55,7 +55,8 @@ class AppTracking():
 			left_vector, right_vector = eye_tracker.get_vectors()
 
 			if left_vector is not None:
-				progress_callback((left_vector, right_vector))
+				position = self.monitor_map.predict(left_vector, right_vector)
+				progress_callback(position)
 		eye_tracker.cleanup()
 		return 0
 
@@ -67,7 +68,7 @@ class AppTracking():
 			time.sleep(1)
 			left_vectors = []
 			right_vectors = []
-			for frame_id in range(3): 
+			for frame_id in range(30): 
 				left_vector, right_vector = eye_tracker.get_vectors()
 				if left_vector is not None:
 					left_vectors.append(left_vector)
@@ -96,7 +97,8 @@ class AppTracking():
 	def close_calibration_thread(self, infos):
 		if type(infos) is str:
 			NotificationCenter().post_notification(AppNotification.SEND_ERROR_MESSAGE, self, f"error: {infos}")
-
+		else:
+			self.monitor_map.train_model()
 	def update_calibration_position(self, notification):
 		point_id, left_vectors, right_vectors = notification.posted_data
 		self.monitor_map.set_new_point(point_id, left_vectors, right_vectors)

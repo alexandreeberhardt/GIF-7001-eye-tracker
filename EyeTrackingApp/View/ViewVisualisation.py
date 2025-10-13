@@ -24,15 +24,12 @@ class ViewVisualisation(tk.Toplevel):
 		self.shared_font = shared_font if shared_font else tkfont.Font(family="Arial", size=10)
 		self.protocol("WM_DELETE_WINDOW", self.on_close)
 		self.initialize_graph()
-		self.left_x = []
-		self.right_x = []
-		self.left_y = []
-		self.right_y = []
+		self.x = []
+		self.y = []
 
 		NotificationCenter().add_observer(self, self.close_all_window, AppNotification.CLOSE_ALL_WINDOW)
 		NotificationCenter().add_observer(self, self.open_this_window, AppNotification.SHOW_SUB_WINDOW)
 		NotificationCenter().add_observer(self, self.draw_graph, AppNotification.SEND_POSITIONS)
-
 
 
 	def close_all_window(self, notification):
@@ -46,34 +43,32 @@ class ViewVisualisation(tk.Toplevel):
 			self.deiconify()
 
 	def initialize_graph(self):
+		w = self.winfo_screenwidth()
+		h = self.winfo_screenheight()
+
 		fig = Figure(figsize=(5, 4), dpi=100)
 		fig.tight_layout()
-		ax = fig.add_subplot(111)
-		ax.set_xlim(-45, 45)
-		ax.set_ylim(-45, 45)
-		self.line1, = ax.plot([], [], marker=".", color="r")
-		self.line2, = ax.plot([], [], marker=".", color="b")
+		self.ax = fig.add_subplot(111)
+		self.line2, = self.ax.plot([0,w,w,0,0], [0,0,h,h,0], color="k")
+		self.line1, = self.ax.plot([], [], marker=".", color="r")
 
-		self.angle_y = ax.text(-40, 40, "Angle y: 0.0", fontsize=12, ha='center')
-		self.angle_x = ax.text(-40, 35, "Angle y: 0.0", fontsize=12, ha='center')
-
+		self.ax.set_xlim(-2000, w + 2000)
+		self.ax.set_ylim(-2000, h + 2000)
 
 		self.canvas = FigureCanvasTkAgg(fig, master=self)
 		self.canvas.get_tk_widget().pack(fill=tk.BOTH, expand=True)
 
 	def draw_graph(self, notification):
-		angle = notification.posted_data
+		pos = notification.posted_data
+		self.x.append(pos[-1])
+		self.y.append(pos[0])
 
-		self.left_x = angle[0].theta_x
-		self.right_x = angle[-1].theta_x
-		self.left_y = angle[0].theta_y
-		self.right_y = angle[-1].theta_y
+		if len(self.x)>20:
+			self.x = self.x[:-20]
+			self.y = self.y[:-20]
 
-		angle_y = np.mean([self.left_y, self.right_y])
-		angle_x = np.mean([self.left_x, self.right_x])
-
-		self.line1.set_data([self.left_x], [self.left_y])
-		self.line2.set_data([self.right_x], [self.right_y])
-		self.angle_y.set_text(f"Angle y: {angle_y:2.2f}")
-		self.angle_x.set_text(f"Angle x: {angle_x:2.2f}")
+		print(pos)
+		# self.ax.set_xlim(np.min(self.x), np.min(self.x) + 10)
+		# self.ax.set_ylim(np.min(self.y), np.min(self.y) + 10)
+		self.line1.set_data(self.x, self.y)
 		self.canvas.draw()
