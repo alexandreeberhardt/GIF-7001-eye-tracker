@@ -48,7 +48,7 @@ class MonitorMap:
 			data[i] = l.x, l.y, l.theta_x, l.theta_y, r.x, r.y, r.theta_x, r.theta_y
 		self.data.append(data)
 
-	def feature_maxtrix(self):
+	def feature_matrix(self):
 		return np.vstack(self.data)
 
 	def train_model(self, polynomial_degree=2, alpha=1):
