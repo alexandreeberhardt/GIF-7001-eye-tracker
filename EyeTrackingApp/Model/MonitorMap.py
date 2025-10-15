@@ -36,8 +36,8 @@ class MonitorMap:
 			sur ton écran, de haut en bas.
 		"""
 
-		x_point = (point_id // 3) * self.w
-		y_point = (point_id % 3) * self.h
+		x_point = (point_id // 3) / 2 * self.w  # Divise par deux, car index va jusqu'à 2x la taille
+		y_point = (point_id % 3) / 2 * self.h
 		nframes = len(right_vectors)
 		self.x_screen.extend([x_point] * nframes)
 		self.y_screen.extend([y_point] * nframes)
