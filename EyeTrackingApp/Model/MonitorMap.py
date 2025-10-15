@@ -52,7 +52,7 @@ class MonitorMap:
 		return np.vstack(self.data)
 
 	def train_model(self, polynomial_degree=2, alpha=1):
-		X = self.feature_maxtrix()
+		X = self.feature_matrix()
 		poly = PolynomialFeatures(degree=polynomial_degree, include_bias=True)
 		scaler = StandardScaler()
 
