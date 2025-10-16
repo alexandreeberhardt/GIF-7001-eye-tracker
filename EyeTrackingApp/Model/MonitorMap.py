@@ -12,14 +12,6 @@ import matplotlib.pyplot as plt
 
 
 @dataclass
-class LineOfSight:
-    x: float  # pixel
-    y: float  # pixel
-    theta_x: float  # degrés
-    theta_y: float  # degrés
-
-
-@dataclass
 class PosWorld:
     x: float  # cm
     y: float  # cm
@@ -38,7 +30,7 @@ class MonitorMap:
         self.feature_mat = None
 
     def set_new_point(self, point_id, left_vectors, right_vectors):
-        """ ici left_vectors et right_vectors sont des listes de LineOfSight
+        """ 
             point_id est un int de 0 à 8, tu peux retrouver la ligne + colonne
             avec point_i//3, point_id%3). cela représente la position relative
             sur ton écran, de haut en bas.
@@ -69,10 +61,9 @@ class MonitorMap:
         pipeline_y.fit(X, self.y_screen)
         self.model_x, self.model_y = pipeline_x, pipeline_y
 
-    def predict(self, left_vector: LineOfSight, right_vector: LineOfSight):
+    def predict(self, left_vector: PosWorld, right_vector: PosWorld):
         if self.model_x is None or self.model_y is None:
             raise ValueError("Please train the model before predicting.")
-        print(left_vector)
         xl = left_vector.x
         yl = left_vector.y
         xr = right_vector.x

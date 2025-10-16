@@ -52,8 +52,8 @@ class ViewVisualisation(tk.Toplevel):
 		self.line2, = self.ax.plot([0,w,w,0,0], [0,0,-h,-h,0], color="k")
 		self.line1, = self.ax.plot([], [], marker=".", color="r")
 
-		self.ax.set_xlim(-2000, w + 2000)
-		self.ax.set_ylim(-h-2000, 2000)
+		self.ax.set_xlim(-1000, w + 1000)
+		self.ax.set_ylim(-h-1000, 1000)
 
 		self.canvas = FigureCanvasTkAgg(fig, master=self)
 		self.canvas.get_tk_widget().pack(fill=tk.BOTH, expand=True)
@@ -67,8 +67,5 @@ class ViewVisualisation(tk.Toplevel):
 			self.x.pop(0)
 			self.y.pop(0)
 
-		print(pos)
-		# self.ax.set_xlim(np.min(self.x), np.min(self.x) + 10)
-		# self.ax.set_ylim(np.min(self.y), np.min(self.y) + 10)
 		self.line1.set_data(self.x, self.y)
 		self.canvas.draw()
