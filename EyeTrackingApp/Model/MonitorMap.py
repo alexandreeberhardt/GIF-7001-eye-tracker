@@ -18,6 +18,12 @@ class LineOfSight:
 	theta_y: float  # degrés
 
 
+@dataclass
+class PosWorld:
+	x: float  # cm
+	y: float  # cm
+
+
 class MonitorMap:
 	def __init__(self, screen_width, screen_height):
 		self.w = screen_width

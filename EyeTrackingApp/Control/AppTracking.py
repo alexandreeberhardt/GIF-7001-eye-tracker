@@ -5,6 +5,7 @@ from Model.SingletonDecorator import singleton
 from Model.ThreadWorker import Worker
 from Model.EyeTracker import EyeTracker
 from Model.MonitorMap import MonitorMap
+from Model.ConvertCoordinate import ConvertCoordinate
 import numpy as np
 import random as rd
 import shutil
@@ -18,6 +19,7 @@ class AppTracking():
 		super().__init__()
 		self.actual_worker = Worker(self.tracking_function, None)
 		self.monitor_map = MonitorMap(screen_width, screen_height)
+		self.convert_coordinate = ConvertCoordinate(screen_width, screen_height)
 		self.notification_subscription()
 
 	def notification_subscription(self):
@@ -101,4 +103,10 @@ class AppTracking():
 			self.monitor_map.train_model()
 	def update_calibration_position(self, notification):
 		point_id, left_vectors, right_vectors = notification.posted_data
-		self.monitor_map.set_new_point(point_id, left_vectors, right_vectors)
+		left_positions = []
+		right_positions = []
+		for i in range(len(left_vectors)): 
+			left_pos, right_pos = self.convert_coordinate.camera_to_world(left_vectors[i], right_vectors[i], 60)
+			left_positions.append(left_pos)
+			right_positions.append(right_pos)
+		self.monitor_map.set_new_point(point_id, left_positions, right_positions)

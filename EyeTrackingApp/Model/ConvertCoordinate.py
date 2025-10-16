@@ -10,6 +10,13 @@ class LineOfSight:
 	theta_y: float  # degrés
 
 
+@dataclass
+class PosWorld:
+	x: float  # cm
+	y: float  # cm
+
+
+
 class ConvertCoordinate:
 	def __init__(self, screen_width, screen_height):
 		self.w = screen_width
@@ -26,4 +33,9 @@ class ConvertCoordinate:
 			 MonitorMap. Est-ce que ça vous va?
 		"""
 		# test un peu bullshit qui montre l'idée générale du calcul à faire
-		new_x = l*(left_vector.x-self.w/2)/self.w + l*np.tan(np.pi*left_vector.theta_x/180)
+		alpha_l = np.abs(left_vector.x-right_vector.x)/10 # pixel/cm
+		left_x_world = (left_vector.x-self.w/2)/alpha_l + l*np.tan(np.pi*left_vector.theta_x/180) # cm
+		left_y_world = (left_vector.y-self.h/2)/alpha_l + l*np.tan(np.pi*left_vector.theta_y/180) # cm
+		right_x_world = (right_vector.x-self.w/2)/alpha_l + l*np.tan(np.pi*right_vector.theta_x/180) # cm
+		right_y_world = (right_vector.x-self.h/2)/alpha_l + l*np.tan(np.pi*right_vector.theta_y/180) # cm
+		return PosWorld(left_x_world, left_y_world), PosWorld(right_x_world, right_y_world)
