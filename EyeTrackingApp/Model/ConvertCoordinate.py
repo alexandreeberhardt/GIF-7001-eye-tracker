@@ -33,7 +33,7 @@ class ConvertCoordinate:
 			 MonitorMap. Est-ce que ça vous va?
 		"""
 		# test un peu bullshit qui montre l'idée générale du calcul à faire
-		alpha_l = np.abs(left_vector.x-right_vector.x)/10 # pixel/cm
+		alpha_l = np.abs(left_vector.x-right_vector.x) / 6  # pixel/cm, environ 6 cm entre les pupilles
 		left_x_world = (left_vector.x-self.w/2)/alpha_l + l*np.tan(np.pi*left_vector.theta_x/180) # cm
 		left_y_world = (left_vector.y-self.h/2)/alpha_l + l*np.tan(np.pi*left_vector.theta_y/180) # cm
 		right_x_world = (right_vector.x-self.w/2)/alpha_l + l*np.tan(np.pi*right_vector.theta_x/180) # cm

@@ -57,7 +57,8 @@ class AppTracking():
 			left_vector, right_vector = eye_tracker.get_vectors()
 
 			if left_vector is not None:
-				position = self.monitor_map.predict(left_vector, right_vector)
+				new_left, new_right = self.convert_coordinate.camera_to_world(left_vector, right_vector, 60)
+				position = self.monitor_map.predict(new_left, new_right)
 				progress_callback(position)
 		eye_tracker.cleanup()
 		return 0

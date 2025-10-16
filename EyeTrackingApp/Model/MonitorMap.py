@@ -41,17 +41,16 @@ class MonitorMap:
 			avec point_i//3, point_id%3). cela représente la position relative
 			sur ton écran, de haut en bas.
 		"""
-
 		x_point = (point_id // 3) / 2 * self.w  # Divise par deux, car index va jusqu'à 2x la taille
 		y_point = (point_id % 3) / 2 * self.h
 		nframes = len(right_vectors)
 		self.x_screen.extend([x_point] * nframes)
 		self.y_screen.extend([y_point] * nframes)
-		data = np.zeros((len(right_vectors), 8))
+		data = np.zeros((len(right_vectors), 4))
 		for i in range(nframes):
 			l = left_vectors[i]
 			r = right_vectors[i]
-			data[i] = l.x, l.y, l.theta_x, l.theta_y, r.x, r.y, r.theta_x, r.theta_y
+			data[i] = l.x, l.y, r.x, r.y
 		self.data.append(data)
 
 	def feature_matrix(self):
@@ -71,15 +70,12 @@ class MonitorMap:
 	def predict(self, left_vector: LineOfSight, right_vector: LineOfSight):
 		if self.model_x is None or self.model_y is None:
 			raise ValueError("Please train the model before predicting.")
+		print(left_vector)
 		xl = left_vector.x
 		yl = left_vector.y
-		txl = left_vector.theta_x
-		tyl = left_vector.theta_y
 		xr = right_vector.x
 		yr = right_vector.y
-		txr = right_vector.theta_x
-		tyr = right_vector.theta_y
-		X = np.array([xl, yl, txl, tyl, xr, yr, txr, tyr]).reshape(1, -1)
+		X = np.array([xl, yl, xr, yr]).reshape(1, -1)
 		pred_x = self.model_x.predict(X)
 		pred_y = self.model_y.predict(X)
 		return np.array([pred_y, pred_x])
