@@ -49,11 +49,11 @@ class ViewVisualisation(tk.Toplevel):
 		fig = Figure(figsize=(5, 4), dpi=100)
 		fig.tight_layout()
 		self.ax = fig.add_subplot(111)
-		self.line2, = self.ax.plot([0,w,w,0,0], [0,0,h,h,0], color="k")
+		self.line2, = self.ax.plot([0,w,w,0,0], [0,0,-h,-h,0], color="k")
 		self.line1, = self.ax.plot([], [], marker=".", color="r")
 
 		self.ax.set_xlim(-2000, w + 2000)
-		self.ax.set_ylim(-2000, h + 2000)
+		self.ax.set_ylim(-h-2000, 2000)
 
 		self.canvas = FigureCanvasTkAgg(fig, master=self)
 		self.canvas.get_tk_widget().pack(fill=tk.BOTH, expand=True)
@@ -61,7 +61,7 @@ class ViewVisualisation(tk.Toplevel):
 	def draw_graph(self, notification):
 		pos = notification.posted_data
 		self.x.append(pos[-1])
-		self.y.append(pos[0])
+		self.y.append(-pos[0])
 
 		if len(self.x)>20:
 			self.x.pop(0)
