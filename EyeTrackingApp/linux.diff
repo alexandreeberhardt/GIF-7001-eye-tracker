@@ -1,0 +1,65 @@
+diff --git a/EyeTrackingApp/View/ViewCalibration - Copie.py b/EyeTrackingApp/View/ViewCalibration - Copie.py
+index 661174c..f93f0a0 100644
+--- a/EyeTrackingApp/View/ViewCalibration - Copie.py	
++++ b/EyeTrackingApp/View/ViewCalibration - Copie.py	
+@@ -20,7 +20,8 @@ class ViewCalibration(tk.Toplevel):
+ 		super().__init__()
+ 		self.withdraw()
+ 		self.attributes("-topmost", True)
+-		self.iconbitmap(f"{os.path.abspath('')}{os.sep}View{os.sep}logo{os.sep}logo.ico")
++		from tkinter import PhotoImage
++		self.iconphoto(False, PhotoImage(file="View/logo/logo.png"))
+ 		self.shared_font = shared_font if shared_font else tkfont.Font(family="Arial", size=10)
+ 		self.protocol("WM_DELETE_WINDOW", self.on_close)
+ 		self.initialize_graph()
+diff --git a/EyeTrackingApp/View/ViewCalibration.py b/EyeTrackingApp/View/ViewCalibration.py
+index d194ee4..c171c06 100644
+--- a/EyeTrackingApp/View/ViewCalibration.py
++++ b/EyeTrackingApp/View/ViewCalibration.py
+@@ -26,7 +26,8 @@ class ViewCalibration(tk.Toplevel):
+ 		self.canvas = tk.Canvas(self, bg='black', highlightthickness=0)
+ 		self.canvas.pack(fill='both', expand=True)
+ 
+-		self.iconbitmap(f"{os.path.abspath('')}{os.sep}View{os.sep}logo{os.sep}logo.ico")
++		from tkinter import PhotoImage
++		self.iconphoto(False, PhotoImage(file="View/logo/logo.png"))	
+ 		self.shared_font = shared_font if shared_font else tkfont.Font(family="Arial", size=10)
+ 		self.protocol("WM_DELETE_WINDOW", self.on_close)
+ 		self.bind('<Escape>', lambda e: self.on_close())
+diff --git a/EyeTrackingApp/View/ViewVisualisation.py b/EyeTrackingApp/View/ViewVisualisation.py
+index d4b7907..3029e99 100644
+--- a/EyeTrackingApp/View/ViewVisualisation.py
++++ b/EyeTrackingApp/View/ViewVisualisation.py
+@@ -20,7 +20,8 @@ class ViewVisualisation(tk.Toplevel):
+ 		super().__init__()
+ 		self.withdraw()
+ 		self.attributes("-topmost", True)
+-		self.iconbitmap(f"{os.path.abspath('')}{os.sep}View{os.sep}logo{os.sep}logo.ico")
++		from tkinter import PhotoImage
++		self.iconphoto(False, PhotoImage(file="View/logo/logo.png"))
+ 		self.shared_font = shared_font if shared_font else tkfont.Font(family="Arial", size=10)
+ 		self.protocol("WM_DELETE_WINDOW", self.on_close)
+ 		self.initialize_graph()
+@@ -61,7 +62,7 @@ class ViewVisualisation(tk.Toplevel):
+ 	def draw_graph(self, notification):
+ 		pos = notification.posted_data
+ 		self.x.append(pos[-1])
+-		self.y.append(pos[0])
++		self.y.append(-pos[0])
+ 
+ 		if len(self.x)>20:
+ 			self.x.pop(0)
+diff --git a/EyeTrackingApp/View/mainWindow.py b/EyeTrackingApp/View/mainWindow.py
+index 88812ca..a3bebe3 100644
+--- a/EyeTrackingApp/View/mainWindow.py
++++ b/EyeTrackingApp/View/mainWindow.py
+@@ -57,7 +57,8 @@ class MainWindow(tk.Tk):
+ 		self.style.map("TCombobox",foreground=[('disabled', fg_text)],fieldbackground=[('disabled', bg_entry)],background=[('disabled', bg_entry)])
+ 
+ 		self.setup_window_tabs()
+-		self.iconbitmap(f"{os.path.abspath('')}{os.sep}View{os.sep}logo{os.sep}logo.ico")
++		from tkinter import PhotoImage
++		self.iconphoto(False, PhotoImage(file="View/logo/logo.png"))
+ 		self.attributes("-topmost", True)
+ 
+ 		GlobalVariables().root = self
