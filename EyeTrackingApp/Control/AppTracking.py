@@ -19,8 +19,8 @@ class AppTracking():
     def __init__(self, screen_width, screen_height):
         super().__init__()
         self.actual_worker = Worker(self.tracking_function, None)
-        calib_model_x_path = "../model_x.pkl"
-        calib_model_y_path = "../model_y.pkl"
+        calib_model_x_path = "model_x.pkl"
+        calib_model_y_path = "model_y.pkl"
         if os.path.exists(calib_model_x_path) and os.path.exists(calib_model_y_path):
             with open(calib_model_x_path, "rb") as f:
                 model_x = load(f)

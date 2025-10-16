@@ -88,7 +88,7 @@ class MonitorMap:
     def save_models(self):
         if self.model_x is None or self.model_y is None:
             raise ValueError("Please train the model before saving.")
-        with open("../model_x.pkl", "wb") as f:
+        with open("model_x.pkl", "wb") as f:
             dump(self.model_x, f, protocol=5)
-        with open("../model_y.pkl", "wb") as f:
+        with open("model_y.pkl", "wb") as f:
             dump(self.model_y, f, protocol=5)
