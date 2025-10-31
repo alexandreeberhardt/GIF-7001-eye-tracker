@@ -30,7 +30,8 @@ class AppTracking():
         else:
             pre_existing_models = None
         self.monitor_map = MonitorMap(screen_width, screen_height, pre_existing_models)
-        self.convert_coordinate = ConvertCoordinate(screen_width, screen_height)
+        eye_tracker = EyeTracker()
+        self.convert_coordinate = ConvertCoordinate(eye_tracker.width, eye_tracker.height)
         self.notification_subscription()
 
     def notification_subscription(self):

@@ -1,6 +1,7 @@
 import warnings
 warnings.filterwarnings("ignore")
 from dataclasses import dataclass
+from scipy.ndimage import gaussian_filter
 import mediapipe as mp
 import numpy as np
 import cv2
@@ -29,6 +30,9 @@ class EyeTracker:
 		self.cap = cv2.VideoCapture(camera_index)
 		self.frame_average = frame_average
 		self.positions = None
+
+		self.width  = int(self.cap.get(cv2.CAP_PROP_FRAME_WIDTH))
+		self.height = int(self.cap.get(cv2.CAP_PROP_FRAME_HEIGHT))
 
 		#Buffer pour le lissage
 		self.left_pupil_buffer = []
@@ -186,6 +190,7 @@ class EyeTracker:
 
 	def get_vectors(self):
 		ret, frame = self.cap.read()
+		frame  = gaussian_filter(frame, sigma=2, radius=8)
 		infos = self.process_frame(frame)
 		if infos.eye_left is None:
 			return None, None
