@@ -27,7 +27,7 @@ class ViewCalibration(tk.Toplevel):
 		self.canvas.pack(fill='both', expand=True)
 
 		#self.iconbitmap(f"{os.path.abspath('')}{os.sep}View{os.sep}logo{os.sep}logo.ico")
-		self.iconphoto(False, tk.PhotoImage(file="EyeTrackingApp/View/logo/logo.png"))
+		self.iconphoto(False, tk.PhotoImage(file="View/logo/logo.png"))
 		self.shared_font = shared_font if shared_font else tkfont.Font(family="Arial", size=10)
 		self.protocol("WM_DELETE_WINDOW", self.on_close)
 		self.bind('<Escape>', lambda e: self.on_close())
