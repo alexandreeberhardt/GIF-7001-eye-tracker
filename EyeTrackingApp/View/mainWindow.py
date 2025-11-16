@@ -57,7 +57,8 @@ class MainWindow(tk.Tk):
 		self.style.map("TCombobox",foreground=[('disabled', fg_text)],fieldbackground=[('disabled', bg_entry)],background=[('disabled', bg_entry)])
 
 		self.setup_window_tabs()
-		self.iconbitmap(f"{os.path.abspath('')}{os.sep}View{os.sep}logo{os.sep}logo.ico")
+		#self.iconbitmap(f"{os.path.abspath('')}{os.sep}View{os.sep}logo{os.sep}logo.ico")
+		self.iconphoto(False, tk.PhotoImage(file="EyeTrackingApp/View/logo/logo.png"))
 		self.attributes("-topmost", True)
 
 		GlobalVariables().root = self

@@ -1,0 +1,20 @@
+# bibliothèque principale de détection du regard
+mediapipe==0.10.21
+# opencv complet avec les modules contrib (nécessaire pour MediaPipe)
+opencv-contrib-python==4.11.0.86
+# fondamentaux numériques
+numpy==1.26.4
+scipy>=1.8.0
+# apprentissage automatique pour la calibration
+scikit-learn>=1.7.2
+# visualisation et interface graphique
+matplotlib>=3.10.0
+pillow>=12.0.0
+# bibliothèques installées par mediapipe mais indiquées pour assurer des versions cohérentes
+absl-py==2.3.1
+attrs==25.4.0
+flatbuffers==25.9.23
+protobuf==4.25.8
+jax==0.7.1
+jaxlib==0.7.1
+sounddevice>=0.5.3
