@@ -26,8 +26,9 @@ class LineOfSight:
 	theta_y: float
 
 class EyeTracker:
-	def __init__(self, camera_index=0, frame_average=5):
+	def __init__(self, camera_index=1, frame_average=5):
 		self.cap = cv2.VideoCapture(camera_index)
+
 		self.frame_average = frame_average
 		self.positions = None
 

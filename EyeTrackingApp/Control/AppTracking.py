@@ -14,16 +14,24 @@ from pickle import load
 import os
 
 
+@dataclass
+class Pos:
+	x: int
+	y: int
+
 @singleton
 class AppTracking():
 	def __init__(self, screen_width, screen_height):
 		super().__init__()
 		self.actual_worker = Worker(self.tracking_function, None)
-		self.left_monitor_map = self.setup_monitor_map("left", screen_width, screen_height)
-		self.right_monitor_map = self.setup_monitor_map("right", screen_width, screen_height)
+
+		self.left_monitor_map_1 = MonitorMap(1920, 1080, "camera1_left")
+		self.right_monitor_map_1 = MonitorMap(1920, 1080, "camera1_right")
+		self.left_monitor_map_2 = MonitorMap(1920, 1080, "camera2_left")
+		self.right_monitor_map_2 = MonitorMap(1920, 1080, "camera2_right")
 
 		eye_tracker = EyeTracker()
-		self.convert_coordinate = ConvertCoordinate(eye_tracker.width, eye_tracker.height)
+		self.convert_coordinate = ConvertCoordinate(eye_tracker.width, eye_tracker.height, focal_length_px=983.0)
 		self.notification_subscription()
 
 	def notification_subscription(self):
@@ -31,8 +39,7 @@ class AppTracking():
 		NotificationCenter().add_observer(self, self.stop_tracking, AppNotification.STOP)
 		NotificationCenter().add_observer(self, self.start_calibration, AppNotification.START_CALIBRATION)
 		NotificationCenter().add_observer(self, self.stop_calibration, AppNotification.STOP_CALIBRATION)
-		NotificationCenter().add_observer(self, self.update_calibration_position,
-										  AppNotification.UPDATE_CALIBRATION_POSITION)
+		NotificationCenter().add_observer(self, self.update_calibration_position, AppNotification.UPDATE_CALIBRATION_POSITION)
 
 	def start_tracking(self, notification):
 		args = None
@@ -57,39 +64,68 @@ class AppTracking():
 			self.actual_worker.stop()
 
 	def tracking_function(self, args, progress_callback=None, worker=None):
-		eye_tracker = EyeTracker()
+		eye_tracker_1 = EyeTracker(camera_index=0)
+		eye_tracker_2 = EyeTracker(camera_index=1)
+		start = time.perf_counter()
 		while True:
 			if worker.is_stopped():
 				break
-			left_vector, right_vector = eye_tracker.get_vectors()
+			left_vector_1, right_vector_1 = eye_tracker_1.get_vectors()
+			left_vector_2, right_vector_2 = eye_tracker_2.get_vectors()
 
 			if left_vector is not None:
-				new_left, new_right = self.convert_coordinate.camera_to_world(left_vector, right_vector, 60)
-				position_left = self.left_monitor_map.predict(new_left)
-				position_right = self.right_monitor_map.predict(new_right)
-				progress_callback(position_left)
-		eye_tracker.cleanup()
+				d1 = self.convert_coordinate.compute_head_distance_cm(left_vector_1, right_vector_1)
+				d2 = self.convert_coordinate.compute_head_distance_cm(left_vector_2, right_vector_2)
+
+				new_left_1, new_right_1 = self.convert_coordinate.camera_to_world(left_vector_1, right_vector_1, d1)
+				new_left_2, new_right_2 = self.convert_coordinate.camera_to_world(left_vector_2, right_vector_1, d2)
+
+				position_left_1 = self.left_monitor_map_1.predict(new_left_1)
+				position_right_1 = self.left_monitor_map_1.predict(new_right_1)
+				position_left_2 = self.left_monitor_map_2.predict(new_left_2)
+				position_right_2 = self.left_monitor_map_2.predict(new_right_2)
+
+				x = np.mean([position_left_1.x, position_right_1.x, position_left_2.x, position_right_2.x])
+				y = np.mean([position_left_1.y, position_right_1.y, position_left_2.y, position_right_2.y])
+				progress_callback(Pos(int(x), int(y)))
+		eye_tracker_1.cleanup()
+		eye_tracker_2.cleanup()
 		return 0
 
 	def calibration_function(self, args, progress_callback=None, worker=None):
-		eye_tracker = EyeTracker()
-		progress_callback((10, None, None))
+		eye_tracker_1 = EyeTracker(camera_index=0)
+		eye_tracker_2 = EyeTracker(camera_index=1)
+		progress_callback((10, None, None, None, None))
 		for point_id in range(9):
-			progress_callback((point_id, None, None))
+			progress_callback((point_id, None, None, None, None))
 			time.sleep(1)
-			left_vectors = []
-			right_vectors = []
+			left_positions_1 = []
+			right_positions_1 = []
+
+			left_positions_2 = []
+			right_positions_2 = []
+
 			for buffer_frame in range(15):
-				left_vector, right_vector = eye_tracker.get_vectors()
+				_, _ = eye_tracker_1.get_vectors()
+				_, _ = eye_tracker_2.get_vectors()
 			for frame_id in range(30):
-				left_vector, right_vector = eye_tracker.get_vectors()
-				if left_vector is not None:
-					left_vectors.append(left_vector)
-					right_vectors.append(right_vector)
-			progress_callback((point_id, left_vectors, right_vectors))
+				left_vector_1, right_vector_1 = eye_tracker_1.get_vectors()
+				left_vector_2, right_vector_2 = eye_tracker_2.get_vectors()
+				if left_vector_1 is not None:
+					d1 = self.convert_coordinate.compute_head_distance_cm(left_vector_1, right_vector_1)
+					d2 = self.convert_coordinate.compute_head_distance_cm(left_vector_2, right_vector_2)
+
+					left_pos_1, right_pos_1 = self.convert_coordinate.camera_to_world(left_vector_1, right_vector_1, d1)
+					left_pos_2, right_pos_2 = self.convert_coordinate.camera_to_world(left_vector_2, right_vector_2, d2)
+
+					left_positions_1.append(left_pos_1)
+					right_positions_1.append(right_pos__1)
+					left_positions_2.append(left_pos__2)
+					right_positions_2.append(right_pos__2)
+			progress_callback((point_id, left_positions_1, right_positions_1, left_positions_2, right_positions_2))
 			if worker.is_stopped():
 				break
-		progress_callback((10, None, None))
+		progress_callback((10, None, None, None, None))
 		eye_tracker.cleanup()
 		NotificationCenter().post_notification(AppNotification.CLOSE_CALIBRATION_WINDOW, self, True)
 		return 0
@@ -111,31 +147,23 @@ class AppTracking():
 		if type(infos) is str:
 			NotificationCenter().post_notification(AppNotification.SEND_ERROR_MESSAGE, self, f"error: {infos}")
 		else:
-			self.left_monitor_map.train_model()
-			self.left_monitor_map.save_models("left")
-			self.right_monitor_map.train_model()
-			self.right_monitor_map.save_models("right")
+			self.left_monitor_map_1.train_model()
+			self.right_monitor_map_1.train_model()
+			self.left_monitor_map_2.train_model()
+			self.right_monitor_map_2.train_model()
+
+			self.left_monitor_map_1.save_models("camera1_left")
+			self.right_monitor_map_1.save_models("camera1_right")
+			self.left_monitor_map_2.save_models("camera2_left")
+			self.right_monitor_map_2.save_models("camera2_right")
 
 	def update_calibration_position(self, notification):
-		point_id, left_vectors, right_vectors = notification.posted_data
-		left_positions = []
-		right_positions = []
-		for i in range(len(left_vectors)):
-			left_pos, right_pos = self.convert_coordinate.camera_to_world(left_vectors[i], right_vectors[i], 60)
-			left_positions.append(left_pos)
-			right_positions.append(right_pos)
+		point_id, left_positions_1, right_positions_1, left_positions_2, right_positions_2 = notification.posted_data
+
 		self.left_monitor_map.set_new_point(point_id, left_positions)
 		self.right_monitor_map.set_new_point(point_id, right_positions)
 
-	def setup_monitor_map(self, eye, screen_width, screen_height):
-		calib_model_x_path = eye + "_model_x.pkl"
-		calib_model_y_path = eye + "_model_y.pkl"
-		if os.path.exists(calib_model_x_path) and os.path.exists(calib_model_y_path):
-			with open(calib_model_x_path, "rb") as f:
-				model_x = load(f)
-			with open(calib_model_y_path, "rb") as f:
-				model_y = load(f)
-			pre_existing_models = [model_x, model_y]
-		else:
-			pre_existing_models = None
-		return MonitorMap(screen_width, screen_height, pre_existing_models)
+		self.left_monitor_map_1.set_new_point(point_id, left_positions_1)
+		self.right_monitor_map_1.set_new_point(point_id, right_positions_1)
+		self.left_monitor_map_2.set_new_point(point_id, left_positions_2)
+		self.right_monitor_map_2.set_new_point(point_id, right_positions_2)
