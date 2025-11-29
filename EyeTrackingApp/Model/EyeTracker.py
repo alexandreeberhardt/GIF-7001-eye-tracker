@@ -1,239 +1,373 @@
 import warnings
+
 warnings.filterwarnings("ignore")
 from dataclasses import dataclass
 from scipy.ndimage import gaussian_filter
 import mediapipe as mp
 import numpy as np
+
 import cv2
+
 
 @dataclass
 class Infos:
-	eye_left: np.ndarray
-	eye_right: np.ndarray
-	pupil_left: np.ndarray
-	pupil_right: np.ndarray
-	x_size: float
-	y_size: float
-	pitch: float
-	yaw: float
-	roll: float
+    eye_left: np.ndarray
+    eye_right: np.ndarray
+    pupil_left: np.ndarray
+    pupil_right: np.ndarray
+    x_size: float
+    y_size: float
+    pitch: float
+    yaw: float
+    roll: float
+    left_EAR: float
+    right_EAR: float
+    left_wink: bool
+    right_wink: bool
+
 
 @dataclass
 class LineOfSight:
-	x: float
-	y: float
-	theta_x: float
-	theta_y: float
+    x: float
+    y: float
+    theta_x: float
+    theta_y: float
+
+
+def euclidean_dist(p1, p2):
+    return np.linalg.norm(np.array(p1) - np.array(p2))
+
+
+def EAR(landmarks, w, h, left: bool = True):
+    if left:
+        TOP = [159, 160]
+        BOTTOM = [144, 145]
+        LEFT = 33
+        RIGHT = 133
+    else:
+        TOP = [386, 387]
+        BOTTOM = [373, 374]
+        LEFT = 362
+        RIGHT = 263
+    top = np.mean([(landmarks[i].x * w, landmarks[i].y * h) for i in TOP], axis=0)
+    bottom = np.mean([(landmarks[i].x * w, landmarks[i].y * h) for i in BOTTOM], axis=0)
+    left = (landmarks[LEFT].x * w, landmarks[LEFT].y * h)
+    right = (landmarks[RIGHT].x * w, landmarks[RIGHT].y * h)
+
+    # Distances
+    vertical = euclidean_dist(top, bottom)
+    horizontal = euclidean_dist(left, right)
+
+    return vertical / horizontal if horizontal > 0 else 0
+
 
 class EyeTracker:
-	def __init__(self, camera_index=1, frame_average=5):
-		self.cap = cv2.VideoCapture(camera_index)
+    def __init__(self, camera_index=1, frame_average=5):
+        self.cap = cv2.VideoCapture(camera_index)
 
-		self.frame_average = frame_average
-		self.positions = None
+        self.frame_average = frame_average
+        self.positions = None
 
-		self.width  = int(self.cap.get(cv2.CAP_PROP_FRAME_WIDTH))
-		self.height = int(self.cap.get(cv2.CAP_PROP_FRAME_HEIGHT))
+        self.width = int(self.cap.get(cv2.CAP_PROP_FRAME_WIDTH))
+        self.height = int(self.cap.get(cv2.CAP_PROP_FRAME_HEIGHT))
 
-		#Buffer pour le lissage
-		self.left_pupil_buffer = []
-		self.right_pupil_buffer = []
-		self.x_size_buffer = []
-		self.y_size_buffer = []
-		self.left_eye_buffer = []
-		self.right_eye_buffer = []
+        # Buffer pour le lissage
+        self.left_pupil_buffer = []
+        self.right_pupil_buffer = []
+        self.x_size_buffer = []
+        self.y_size_buffer = []
+        self.left_eye_buffer = []
+        self.right_eye_buffer = []
 
-		# Regions d'intérêts
-		self.LEFT_EYE = [33, 133] # coins des yeux
-		self.RIGHT_EYE = [263, 362] # coins des yeux
-		self.LEFT_ORBIT = [33, 133, 160, 159, 158, 144, 145, 153, 154, 155]
-		self.RIGHT_ORBIT = [263, 362, 387, 386, 385, 373, 374, 380, 381, 382]
-		self.LEFT_PUPIL = 468
-		self.RIGHT_PUPIL = 473
+        self.wink_window = 10
+        self.min_consec_frames = 3  # frames consécutives pour valider un wink
+        self.left_wink_counter = 0
+        self.right_wink_counter = 0
+        self.left_wink_cooldown = 0  # pour éviter double-detection
+        self.right_wink_cooldown = 0
+        self.cooldown_frames = 6  # ignore détections pendant X frames après un wink
 
-		# MediaPipe Face Mesh
-		self.face_mesh = mp.solutions.face_mesh.FaceMesh(max_num_faces=1, refine_landmarks=True)
+        # Regions d'intérêts
+        self.LEFT_EYE = [33, 133]  # coins des yeux
+        self.RIGHT_EYE = [263, 362]  # coins des yeux
+        self.LEFT_ORBIT = [33, 133, 160, 159, 158, 144, 145, 153, 154, 155]
+        self.RIGHT_ORBIT = [263, 362, 387, 386, 385, 373, 374, 380, 381, 382]
+        self.LEFT_PUPIL = 468
+        self.RIGHT_PUPIL = 473
 
-	def get_head_pose(self, landmarks, w, h):
-		FACE_IDX = {
-			"nose_tip": 1,
-			"chin": 152,
-			"left_eye_corner": 33,
-			"right_eye_corner": 263,
-			"left_mouth": 61,
-			"right_mouth": 291}
+        # MediaPipe Face Mesh
+        self.face_mesh = mp.solutions.face_mesh.FaceMesh(max_num_faces=1, refine_landmarks=True)
 
-		model_points = np.array([
-			(0.0, 0.0, 0.0),			 # nez
-			(0.0, -63.6, -12.5),		 # menton
-			(-43.3, 32.7, -26.0),		# coin œil gauche
-			(43.3, 32.7, -26.0),		 # coin œil droit
-			(-28.9, -28.9, -24.1),	   # bouche gauche
-			(28.9, -28.9, -24.1)])		 # bouche droite
+    def get_head_pose(self, landmarks, w, h):
+        FACE_IDX = {
+            "nose_tip": 1,
+            "chin": 152,
+            "left_eye_corner": 33,
+            "right_eye_corner": 263,
+            "left_mouth": 61,
+            "right_mouth": 291}
 
-		image_points = np.array([
-			(landmarks[FACE_IDX["nose_tip"]].x * w, landmarks[FACE_IDX["nose_tip"]].y * h),
-			(landmarks[FACE_IDX["chin"]].x * w, landmarks[FACE_IDX["chin"]].y * h),
-			(landmarks[FACE_IDX["left_eye_corner"]].x * w, landmarks[FACE_IDX["left_eye_corner"]].y * h),
-			(landmarks[FACE_IDX["right_eye_corner"]].x * w, landmarks[FACE_IDX["right_eye_corner"]].y * h),
-			(landmarks[FACE_IDX["left_mouth"]].x * w, landmarks[FACE_IDX["left_mouth"]].y * h),
-			(landmarks[FACE_IDX["right_mouth"]].x * w, landmarks[FACE_IDX["right_mouth"]].y * h)], dtype="double")
+        model_points = np.array([
+            (0.0, 0.0, 0.0),  # nez
+            (0.0, -63.6, -12.5),  # menton
+            (-43.3, 32.7, -26.0),  # coin œil gauche
+            (43.3, 32.7, -26.0),  # coin œil droit
+            (-28.9, -28.9, -24.1),  # bouche gauche
+            (28.9, -28.9, -24.1)])  # bouche droite
 
-		focal_length = w
-		center = (w/2, h/2)
-		camera_matrix = np.array([
-			[focal_length, 0, center[0]],
-			[0, focal_length, center[1]],
-			[0, 0, 1]], dtype="double")
+        image_points = np.array([
+            (landmarks[FACE_IDX["nose_tip"]].x * w, landmarks[FACE_IDX["nose_tip"]].y * h),
+            (landmarks[FACE_IDX["chin"]].x * w, landmarks[FACE_IDX["chin"]].y * h),
+            (landmarks[FACE_IDX["left_eye_corner"]].x * w, landmarks[FACE_IDX["left_eye_corner"]].y * h),
+            (landmarks[FACE_IDX["right_eye_corner"]].x * w, landmarks[FACE_IDX["right_eye_corner"]].y * h),
+            (landmarks[FACE_IDX["left_mouth"]].x * w, landmarks[FACE_IDX["left_mouth"]].y * h),
+            (landmarks[FACE_IDX["right_mouth"]].x * w, landmarks[FACE_IDX["right_mouth"]].y * h)], dtype="double")
 
-		dist_coeffs = np.zeros((4,1))
-		success, rotation_vector, translation_vector = cv2.solvePnP(
-			model_points, image_points, camera_matrix, dist_coeffs, flags=cv2.SOLVEPNP_ITERATIVE)
+        focal_length = w
+        center = (w / 2, h / 2)
+        camera_matrix = np.array([
+            [focal_length, 0, center[0]],
+            [0, focal_length, center[1]],
+            [0, 0, 1]], dtype="double")
 
-		rotation_matrix, _ = cv2.Rodrigues(rotation_vector)
-		proj_matrix = np.hstack((rotation_matrix, translation_vector))
-		_, _, _, _, _, _, euler_angles = cv2.decomposeProjectionMatrix(proj_matrix)
+        dist_coeffs = np.zeros((4, 1))
+        success, rotation_vector, translation_vector = cv2.solvePnP(
+            model_points, image_points, camera_matrix, dist_coeffs, flags=cv2.SOLVEPNP_ITERATIVE)
 
-		pitch, yaw, roll = [float(a) for a in euler_angles]
-		return pitch, yaw, roll
+        rotation_matrix, _ = cv2.Rodrigues(rotation_vector)
+        proj_matrix = np.hstack((rotation_matrix, translation_vector))
+        _, _, _, _, _, _, euler_angles = cv2.decomposeProjectionMatrix(proj_matrix)
 
-	def get_bbox(self, landmarks, indices, w, h, margin=0):
-		xs = [landmarks[i].x * w for i in indices]
-		ys = [landmarks[i].y * h for i in indices]
-		xmin, xmax = int(min(xs)) - margin, int(max(xs)) + margin
-		ymin, ymax = int(min(ys)) - margin, int(max(ys)) + margin
-		return max(0, xmin), max(0, ymin), min(w, xmax), min(h, ymax)
+        pitch, yaw, roll = [float(a) for a in euler_angles]
+        return pitch, yaw, roll
 
-	def get_eye_center(self, landmarks, indices, w, h):
-		xs = [landmarks[i].x * w for i in indices]
-		ys = [landmarks[i].y * h for i in indices]
-		
-		return np.array([ys[-1], np.mean(xs)])
+    def get_EAR(self, landmarks, w, h, left: bool = True):
+        ear = EAR(landmarks, w, h, left)
+        return ear
 
-	def get_left_eye_center(self, landmarks, w, h):
-		x = w * np.mean([landmarks[33].x,  landmarks[133].x])
-		y = h * np.mean([landmarks[225].y,
-			landmarks[224].y, landmarks[223].y, landmarks[222].y,
-			landmarks[221].y, landmarks[117].y, landmarks[118].y,
-			landmarks[119].y, landmarks[120].y, landmarks[121].y])
-		return np.array([y, x])
+    def get_bbox(self, landmarks, indices, w, h, margin=0):
+        xs = [landmarks[i].x * w for i in indices]
+        ys = [landmarks[i].y * h for i in indices]
+        xmin, xmax = int(min(xs)) - margin, int(max(xs)) + margin
+        ymin, ymax = int(min(ys)) - margin, int(max(ys)) + margin
+        return max(0, xmin), max(0, ymin), min(w, xmax), min(h, ymax)
 
-	def get_right_eye_center(self, landmarks, w, h):
-		x = w * np.mean([landmarks[263].x, landmarks[362].x])
-		y = h * np.mean([landmarks[445].y,
-			landmarks[444].y, landmarks[443].y, landmarks[442].y,
-			landmarks[441].y, landmarks[346].y,landmarks[347].y,
-			landmarks[348].y, landmarks[349].y, landmarks[350].y])
-		return np.array([y, x])
+    def get_eye_center(self, landmarks, indices, w, h):
+        xs = [landmarks[i].x * w for i in indices]
+        ys = [landmarks[i].y * h for i in indices]
 
-	def get_pupil_center(self, landmarks, indice, w, h):
-		x = landmarks[indice].x * w
-		y = landmarks[indice].y * h
-		return np.array([y, x])
+        return np.array([ys[-1], np.mean(xs)])
 
-	def eye_width(self, landmarks, indices, w, h):
-		x1, y1, x2, y2 = self.get_bbox(landmarks, indices, w, h, margin=0)
-		return np.abs(x2-x1)
+    def get_left_eye_center(self, landmarks, w, h):
+        x = w * np.mean([landmarks[33].x, landmarks[133].x])
+        y = h * np.mean([landmarks[225].y,
+                         landmarks[224].y, landmarks[223].y, landmarks[222].y,
+                         landmarks[221].y, landmarks[117].y, landmarks[118].y,
+                         landmarks[119].y, landmarks[120].y, landmarks[121].y])
+        return np.array([y, x])
 
-	def process_frame(self, frame):
-		h, w, _ = frame.shape
-		# rgb = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
-		results = self.face_mesh.process(frame)
+    def get_right_eye_center(self, landmarks, w, h):
+        x = w * np.mean([landmarks[263].x, landmarks[362].x])
+        y = h * np.mean([landmarks[445].y,
+                         landmarks[444].y, landmarks[443].y, landmarks[442].y,
+                         landmarks[441].y, landmarks[346].y, landmarks[347].y,
+                         landmarks[348].y, landmarks[349].y, landmarks[350].y])
+        return np.array([y, x])
 
-		if not results.multi_face_landmarks:
-			return Infos(None,None,None,None,None,None,None,None,None)
+    def get_pupil_center(self, landmarks, indice, w, h):
+        x = landmarks[indice].x * w
+        y = landmarks[indice].y * h
+        return np.array([y, x])
 
-		lm = results.multi_face_landmarks[0].landmark
+    def eye_width(self, landmarks, indices, w, h):
+        x1, y1, x2, y2 = self.get_bbox(landmarks, indices, w, h, margin=0)
+        return np.abs(x2 - x1)
 
-		pitch, yaw, roll = self.get_head_pose(lm, w, h)
 
-		left_eye_pos = self.get_left_eye_center(lm, w, h)
-		right_eye_pos = self.get_right_eye_center(lm, w, h)
-		left_pupil_pos = self.get_pupil_center(lm, self.LEFT_PUPIL, w, h)
-		right_pupil_pos = self.get_pupil_center(lm, self.RIGHT_PUPIL, w, h)
 
-		size = np.mean([self.eye_width(lm, self.LEFT_EYE, w, h), self.eye_width(lm, self.RIGHT_EYE, w, h)])
-		x_size = size
-		y_size = size
+    def process_frame(self, frame):
+        h, w, _ = frame.shape
+        # rgb = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
+        results = self.face_mesh.process(frame)
 
-		left_eye_pos[0] = left_eye_pos[0] - 0.1*y_size
-		right_eye_pos[0] = right_eye_pos[0] - 0.1*y_size
+        if not results.multi_face_landmarks:
+            return Infos(None, None, None, None, None, None, None, None, None, None, None, None, None)
 
-		self.left_pupil_buffer.append(left_pupil_pos)
-		self.right_pupil_buffer.append(right_pupil_pos)
-		if len(self.left_pupil_buffer) > self.frame_average:
-			self.left_pupil_buffer.pop(0)
-		if len(self.right_pupil_buffer) > self.frame_average:
-			self.right_pupil_buffer.pop(0)
+        lm = results.multi_face_landmarks[0].landmark
 
-		self.left_eye_buffer.append(left_eye_pos)
-		self.right_eye_buffer.append(right_eye_pos)
-		if len(self.left_eye_buffer) > self.frame_average:
-			self.left_eye_buffer.pop(0)
-		if len(self.right_eye_buffer) > self.frame_average:
-			self.right_eye_buffer.pop(0)
+        pitch, yaw, roll = self.get_head_pose(lm, w, h)
 
-		self.x_size_buffer.append(x_size)
-		self.y_size_buffer.append(y_size)
-		if len(self.x_size_buffer) > self.frame_average:
-			self.x_size_buffer.pop(0)
-		if len(self.y_size_buffer) > self.frame_average:
-			self.y_size_buffer.pop(0)
+        left_eye_pos = self.get_left_eye_center(lm, w, h)
+        right_eye_pos = self.get_right_eye_center(lm, w, h)
+        left_pupil_pos = self.get_pupil_center(lm, self.LEFT_PUPIL, w, h)
+        right_pupil_pos = self.get_pupil_center(lm, self.RIGHT_PUPIL, w, h)
+        right_eye_AR = self.get_EAR(lm, w, h, False)
+        left_eye_AR = self.get_EAR(lm, w, h)
 
-		left_smoothed_pupil = np.mean(self.left_pupil_buffer, axis=0)
-		right_smoothed_pupil = np.mean(self.right_pupil_buffer, axis=0)
-		left_smoothed_eye = np.mean(self.left_eye_buffer, axis=0)
-		right_smoothed_eye = np.mean(self.right_eye_buffer, axis=0)
-		x_smoothed_size = np.mean(self.x_size_buffer, axis=0)
-		y_smoothed_size = np.mean(self.y_size_buffer, axis=0)
+        size = np.mean([self.eye_width(lm, self.LEFT_EYE, w, h), self.eye_width(lm, self.RIGHT_EYE, w, h)])
+        x_size = size
+        y_size = size
 
-		return Infos(left_smoothed_eye, right_smoothed_eye, left_smoothed_pupil, right_smoothed_pupil, x_smoothed_size, y_smoothed_size, pitch, yaw, roll)
+        left_eye_pos[0] = left_eye_pos[0] - 0.1 * y_size
+        right_eye_pos[0] = right_eye_pos[0] - 0.1 * y_size
 
-	def get_vectors(self):
-		ret, frame = self.cap.read()
-		frame  = gaussian_filter(frame, sigma=2, radius=8)
-		infos = self.process_frame(frame)
-		if infos.eye_left is None:
-			return None, None
+        self.left_pupil_buffer.append(left_pupil_pos)
+        self.right_pupil_buffer.append(right_pupil_pos)
+        if len(self.left_pupil_buffer) > self.frame_average:
+            self.left_pupil_buffer.pop(0)
+        if len(self.right_pupil_buffer) > self.frame_average:
+            self.right_pupil_buffer.pop(0)
 
-		if infos.pitch<0:
-			infos.pitch = -(180+infos.pitch)
-		else:
-			infos.pitch = 180-infos.pitch
-		# si positif on doit descendre si négatif on doit monter
-		# print(0.05*infos.eye_left[0]*(infos.pitch/90))
-		# if infos.pitch>0:
-		# 	infos.eye_left[0] = infos.eye_left[0] - 0.5*infos.y_size*(infos.pitch/90)
-		# 	infos.eye_right[0] = infos.eye_right[0] - 0.5*infos.y_size*(infos.pitch/90)
-		# else:
-		# 	infos.eye_left[0] = infos.eye_left[0] + 0.5*infos.y_size*(infos.pitch/90)
-		# 	infos.eye_right[0] = infos.eye_right[0] + 0.5*infos.y_size*(infos.pitch/90)
+        self.left_eye_buffer.append(left_eye_pos)
+        self.right_eye_buffer.append(right_eye_pos)
+        if len(self.left_eye_buffer) > self.frame_average:
+            self.left_eye_buffer.pop(0)
+        if len(self.right_eye_buffer) > self.frame_average:
+            self.right_eye_buffer.pop(0)
 
-		if infos.yaw>0:
-			infos.eye_left[1] = infos.eye_left[1] - 0.5*infos.x_size*(infos.yaw/90)
-			infos.eye_right[1] = infos.eye_right[1] - 0.5*infos.x_size*(infos.yaw/90)
-		else:
-			infos.eye_left[1] = infos.eye_left[1] + 0.5*infos.x_size*(infos.yaw/90)
-			infos.eye_right[1] = infos.eye_right[1] + 0.5*infos.x_size*(infos.yaw/90)
+        self.x_size_buffer.append(x_size)
+        self.y_size_buffer.append(y_size)
+        if len(self.x_size_buffer) > self.frame_average:
+            self.x_size_buffer.pop(0)
+        if len(self.y_size_buffer) > self.frame_average:
+            self.y_size_buffer.pop(0)
 
-		dydx_left = 2*(infos.eye_left-infos.pupil_left)/np.array([infos.y_size, infos.x_size])
-		dydx_right = 2*(infos.eye_right-infos.pupil_right)/np.array([infos.y_size, infos.x_size])
+        BLINK_THRESH = 0.2  # valeur initiale à calibrer
+        wink_left = wink_right = False
+        # Right eye: si on est sous le threshold et pas dans le cooldown, on augmente le counter
+        if right_eye_AR <= BLINK_THRESH and self.right_wink_cooldown == 0:
+            self.right_wink_counter += 1
+        else:
+            # si on dépasse min_consec, on déclenche un wink
+            if self.right_wink_counter >= self.min_consec_frames:
+                wink_right = True
+                self.right_wink_cooldown = self.cooldown_frames
+            else:
+                wink_right = False
+            self.right_wink_counter = 0
+            if self.right_wink_cooldown > 0:
+                self.right_wink_cooldown -= 1
 
-		left_y, left_x = dydx_left
-		right_y, right_x = dydx_right
+        # Left eye
+        if left_eye_AR <= BLINK_THRESH and self.left_wink_cooldown == 0:
+            self.left_wink_counter += 1
+        else:
+            if self.left_wink_counter >= self.min_consec_frames:
+                wink_left = True
+                self.left_wink_cooldown = self.cooldown_frames
+            else:
+                wink_left = False
+            self.left_wink_counter = 0
+            if self.left_wink_cooldown > 0:
+                self.left_wink_cooldown -= 1
+        left_smoothed_pupil = np.mean(self.left_pupil_buffer, axis=0)
+        right_smoothed_pupil = np.mean(self.right_pupil_buffer, axis=0)
+        left_smoothed_eye = np.mean(self.left_eye_buffer, axis=0)
+        right_smoothed_eye = np.mean(self.right_eye_buffer, axis=0)
+        x_smoothed_size = np.mean(self.x_size_buffer, axis=0)
+        y_smoothed_size = np.mean(self.y_size_buffer, axis=0)
 
-		angle_left_x = self.compute_angle( np.clip(left_x, -1, 1) )
-		angle_left_y = self.compute_angle( np.clip(left_y, -1, 1) )
-		angle_right_x = self.compute_angle( np.clip(right_x, -1, 1) )
-		angle_right_y = self.compute_angle( np.clip(right_y, -1, 1) )
-		left_vector = LineOfSight(infos.eye_left[-1], infos.eye_left[0], angle_left_x, angle_left_y)
-		right_vector = LineOfSight(infos.eye_right[-1], infos.eye_right[0], angle_right_x, angle_right_y)
-		return left_vector, right_vector
+        return Infos(left_smoothed_eye, right_smoothed_eye, left_smoothed_pupil, right_smoothed_pupil, x_smoothed_size,
+                     y_smoothed_size, pitch, yaw, roll, left_eye_AR, right_eye_AR, wink_left, wink_right)
 
-	def compute_angle(self, x):
-		angle = np.degrees(np.arctan(x))
-		return angle
+    def get_vectors(self):
+        ret, frame = self.cap.read()
+        frame = gaussian_filter(frame, sigma=2, radius=8)
+        infos = self.process_frame(frame)
+        if infos.eye_left is None:
+            return None, None
 
-	def cleanup(self):
-		self.cap.release()
-		cv2.destroyAllWindows()
+        if infos.pitch < 0:
+            infos.pitch = -(180 + infos.pitch)
+        else:
+            infos.pitch = 180 - infos.pitch
+        # si positif on doit descendre si négatif on doit monter
+        # print(0.05*infos.eye_left[0]*(infos.pitch/90))
+        # if infos.pitch>0:
+        # 	infos.eye_left[0] = infos.eye_left[0] - 0.5*infos.y_size*(infos.pitch/90)
+        # 	infos.eye_right[0] = infos.eye_right[0] - 0.5*infos.y_size*(infos.pitch/90)
+        # else:
+        # 	infos.eye_left[0] = infos.eye_left[0] + 0.5*infos.y_size*(infos.pitch/90)
+        # 	infos.eye_right[0] = infos.eye_right[0] + 0.5*infos.y_size*(infos.pitch/90)
+
+        if infos.yaw > 0:
+            infos.eye_left[1] = infos.eye_left[1] - 0.5 * infos.x_size * (infos.yaw / 90)
+            infos.eye_right[1] = infos.eye_right[1] - 0.5 * infos.x_size * (infos.yaw / 90)
+        else:
+            infos.eye_left[1] = infos.eye_left[1] + 0.5 * infos.x_size * (infos.yaw / 90)
+            infos.eye_right[1] = infos.eye_right[1] + 0.5 * infos.x_size * (infos.yaw / 90)
+
+        dydx_left = 2 * (infos.eye_left - infos.pupil_left) / np.array([infos.y_size, infos.x_size])
+        dydx_right = 2 * (infos.eye_right - infos.pupil_right) / np.array([infos.y_size, infos.x_size])
+
+        left_y, left_x = dydx_left
+        right_y, right_x = dydx_right
+
+        angle_left_x = self.compute_angle(np.clip(left_x, -1, 1))
+        angle_left_y = self.compute_angle(np.clip(left_y, -1, 1))
+        angle_right_x = self.compute_angle(np.clip(right_x, -1, 1))
+        angle_right_y = self.compute_angle(np.clip(right_y, -1, 1))
+        left_vector = LineOfSight(infos.eye_left[-1], infos.eye_left[0], angle_left_x, angle_left_y)
+        right_vector = LineOfSight(infos.eye_right[-1], infos.eye_right[0], angle_right_x, angle_right_y)
+        return left_vector, right_vector
+
+    def compute_angle(self, x):
+        angle = np.degrees(np.arctan(x))
+        return angle
+
+    def cleanup(self):
+        self.cap.release()
+        cv2.destroyAllWindows()
+
+
+if __name__ == '__main__':
+    import matplotlib
+
+    matplotlib.use('TkAgg')
+    import matplotlib.pyplot as plt
+    from collections import deque
+    # Visualisation de base
+    et = EyeTracker(0)
+    EAR_history = deque(maxlen=150)
+
+    plt.ion()
+    fig, ax = plt.subplots()
+    line, = ax.plot([], [])
+    ax.set_ylim(0, 0.4)
+    ax.set_xlim(0, 150)
+
+    while True:
+        ret, frame = et.cap.read()
+        if not ret:
+            break
+
+        infos = et.process_frame(frame)
+
+        if infos is None:
+            continue
+
+        # --------------------------
+        # Ajout du EAR dans le graph
+        # --------------------------
+        EAR_history.append(infos.left_EAR)  # ou right_eye
+        line.set_xdata(np.arange(len(EAR_history)))
+        line.set_ydata(EAR_history)
+        ax.set_xlim(0, len(EAR_history) if len(EAR_history) > 50 else 50)
+        fig.canvas.draw()
+        fig.canvas.flush_events()
+
+        # --------------------------
+        # Affichage infos sur frame
+        # --------------------------
+        rEAR = infos.right_EAR
+        lEAR = infos.left_EAR
+        cv2.putText(frame, f'Wink (left): {infos.left_wink}', (30, 30), cv2.FONT_HERSHEY_SIMPLEX, 0.8, (0, 255, 0), 2)
+        cv2.putText(frame, f'Wink (Right): {infos.right_wink}', (300, 30), cv2.FONT_HERSHEY_SIMPLEX, 0.8, (0, 255, 0), 2)
+        cv2.imshow("Eye Tracker Debug", frame)
+
+        if cv2.waitKey(1) & 0xFF == 27:  # ESC pour quitter
+            break
+
+    et.cleanup()
+    plt.ioff()
+    plt.show()
