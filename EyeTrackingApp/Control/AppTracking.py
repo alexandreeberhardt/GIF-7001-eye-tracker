@@ -6,6 +6,7 @@ from Model.ThreadWorker import Worker
 from Model.EyeTracker import EyeTracker
 from Model.MonitorMap import MonitorMap
 from Model.ConvertCoordinate import ConvertCoordinate
+from dataclasses import dataclass
 import numpy as np
 import random as rd
 import shutil
